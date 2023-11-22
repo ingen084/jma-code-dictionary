@@ -7,7 +7,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 
-const string CachePath = "../../../../../.cache/";
+const string CachePath = "../../.cache/";
 const string PageHashPath = CachePath + "pageHash.txt";
 const string ZipLastModifiedPath = CachePath + "zipLastModified.txt";
 
@@ -40,13 +40,12 @@ using var pageResponse = await client.SendAsync(new(HttpMethod.Get, "http://xml.
 var pageContent = await pageResponse.Content.ReadAsByteArrayAsync();
 var pageHash = BitConverter.ToString(MD5.HashData(pageContent));
 
-#if !DEBUG
 if (cachedHash == pageHash)
 {
     Console.WriteLine("Page not modified.");
     return;
 }
-#endif
+Console.WriteLine("Page modified.");
 
 await File.WriteAllTextAsync(PageHashPath, pageHash);
 isModified = true;
@@ -64,14 +63,13 @@ using var zipResponse = await client.SendAsync(new(HttpMethod.Get, zipUrl)
 if (zipResponse.Content.Headers.LastModified is not DateTimeOffset lastModified)
     throw new InvalidOperationException("Last-Modified header not found.");
 
-#if !DEBUG
 if (zipResponse.StatusCode == HttpStatusCode.NotModified)
 {
     Console.WriteLine("Zip not modified.");
     Environment.Exit(isModified ? 1 : 0);
     return;
 }
-#endif
+Console.WriteLine("Zip modified.");
 
 await File.WriteAllTextAsync(ZipLastModifiedPath, lastModified.ToString("o"));
 isModified = true;
