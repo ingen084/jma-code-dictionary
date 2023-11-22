@@ -25,6 +25,6 @@ jobs:
             git config --local user.email "ingen188@gmail.com"
             git config --local user.name "ingen084"
             git add .
-            git commit -m "`` Update"
+            git commit -m "Update `date '+%Y%m%d'`"
             git push
           fi
