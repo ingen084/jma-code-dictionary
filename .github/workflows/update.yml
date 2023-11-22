@@ -21,7 +21,7 @@ jobs:
         run: |
           cd JmaCodeDictionary\JmaCodeDictionaryGenerator
           dotnet run -c Release
-          if [ $? -e 1 ]; then
+          if [ $? = 1 ]; then
             git config --local user.email "ingen188@gmail.com"
             git config --local user.name "ingen084"
             git add .
