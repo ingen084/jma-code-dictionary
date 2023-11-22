@@ -10,6 +10,7 @@ using System.Text;
 const string CachePath = "../../.cache/";
 const string PageHashPath = CachePath + "pageHash.txt";
 const string ZipLastModifiedPath = CachePath + "zipLastModified.txt";
+string basePath = $"../../csv/{DateTime.Now:yyyyMMdd}/";
 
 if (!Directory.Exists(CachePath))
     Directory.CreateDirectory(CachePath);
@@ -77,7 +78,6 @@ isModified = true;
 using var zipStream = await zipResponse.Content.ReadAsStreamAsync();
 using var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Read, false, Encoding.GetEncoding("Shift_JIS"));
 
-string basePath = $"../../../../../csv/{DateTime.Now:yyyyMMdd}/";
 if (!Directory.Exists(basePath))
     Directory.CreateDirectory(basePath);
 
