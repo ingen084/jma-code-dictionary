@@ -1,0 +1,30 @@
+name: update
+
+on:
+  schedule:
+    - cron: "10 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 8.0.x
+      - name: Run
+        id: run
+        continue-on-error: true
+        shell: bash -x {0}
+        run: |
+          cd JmaCodeDictionary\JmaCodeDictionaryGenerator
+          dotnet run -c Release
+          if [ $? -e 1 ]; then
+            git config --local user.email "ingen188@gmail.com"
+            git config --local user.name "ingen084"
+            git add .
+            git commit -m "`` Update"
+            git push
+          fi
