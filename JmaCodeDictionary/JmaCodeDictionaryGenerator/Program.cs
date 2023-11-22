@@ -83,6 +83,7 @@ if (!Directory.Exists(basePath))
 
 foreach (var entry in zipArchive.Entries)
 {
+    Console.WriteLine(entry.FullName);
     if (!entry.FullName.EndsWith(".xls"))
         continue;
 
@@ -175,9 +176,8 @@ foreach (var entry in zipArchive.Entries)
         // PhenologicalType.xls が古すぎるフォーマットのせいで怒られる…。
         Console.WriteLine("旧Excelフォーマットのためスキップされました: " + entry.FullName);
     }
-
-    Environment.Exit(1);
 }
+Environment.Exit(1);
 
 // https://www.data.jma.go.jp/developer/jma_multilingual.xlsx
 
