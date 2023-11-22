@@ -2,7 +2,7 @@ name: update
 
 on:
   schedule:
-    - cron: "10 0 * * *"
+    - cron: "0 10 * * *"
   workflow_dispatch:
 
 jobs:
@@ -21,7 +21,7 @@ jobs:
         run: |
           cd JmaCodeDictionary/JmaCodeDictionaryGenerator
           dotnet run -c Release
-          if [ $? = 1 ]; then
+          if [ $? -eq 1 ]; then
             git remote set-url origin https://github-actions:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}
             git config --global user.email "ingen188@gmail.com"
             git config --global user.name "ingen084"
