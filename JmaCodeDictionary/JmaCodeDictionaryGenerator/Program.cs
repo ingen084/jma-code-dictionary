@@ -10,7 +10,7 @@ using System.Text;
 const string CachePath = "../../.cache/";
 const string PageHashPath = CachePath + "pageHash.txt";
 const string ZipLastModifiedPath = CachePath + "zipLastModified.txt";
-string basePath = $"../../csv/{DateTime.Now:yyyyMMdd}/";
+string basePath = $"../../csv/";
 
 if (!Directory.Exists(CachePath))
     Directory.CreateDirectory(CachePath);
