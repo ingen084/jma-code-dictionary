@@ -28,5 +28,5 @@ jobs:
             git add ../../csv ../../.cache
             git commit -m "Update `date '+%Y.%m.%d'`"
             git push
-            gh release `date '+%Y.%m.%d'`
+            gh release create `date '+%Y.%m.%d'`
           fi
