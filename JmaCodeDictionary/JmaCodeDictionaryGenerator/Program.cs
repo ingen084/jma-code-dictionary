@@ -4,11 +4,10 @@ using NPOI.HSSF;
 using NPOI.SS.UserModel;
 using System.IO.Compression;
 using System.Net;
-using System.Security.Cryptography;
 using System.Text;
 
 const string CachePath = "../../.cache/";
-const string PageHashPath = CachePath + "pageHash.txt";
+const string PageLastModifiedPath = CachePath + "pageLastModified.txt";
 const string ZipLastModifiedPath = CachePath + "zipLastModified.txt";
 string basePath = $"../../csv/";
 
@@ -25,45 +24,52 @@ using var client = new HttpClient(new HttpClientHandler()
 
 bool isModified = false;
 
-string? cachedHash = null;
-if (File.Exists(PageHashPath))
-    cachedHash = await File.ReadAllTextAsync(PageHashPath);
-DateTimeOffset? cachedLastModified = null;
-if (File.Exists(ZipLastModifiedPath))
+DateTimeOffset? pageLastModified = null;
+if (File.Exists(PageLastModifiedPath))
 {
-    if (!DateTimeOffset.TryParse(await File.ReadAllTextAsync(ZipLastModifiedPath), out var c))
-        cachedLastModified = c;
+    if (DateTimeOffset.TryParse(await File.ReadAllTextAsync(PageLastModifiedPath), out var c))
+        pageLastModified = c;
     else
-        cachedLastModified = null;
+        pageLastModified = null;
 }
 
-using var pageResponse = await client.SendAsync(new(HttpMethod.Get, "http://xml.kishou.go.jp/tec_material.html"));
-var pageContent = await pageResponse.Content.ReadAsByteArrayAsync();
-var pageHash = BitConverter.ToString(MD5.HashData(pageContent));
+DateTimeOffset? zipLastModified = null;
+if (File.Exists(ZipLastModifiedPath))
+{
+    if (DateTimeOffset.TryParse(await File.ReadAllTextAsync(ZipLastModifiedPath), out var c))
+        zipLastModified = c;
+    else
+        zipLastModified = null;
+}
 
-if (cachedHash == pageHash)
+using var pageResponse = await client.SendAsync(new(HttpMethod.Get, "http://xml.kishou.go.jp/tec_material.html")
+{
+    Headers = { IfModifiedSince = pageLastModified },
+});
+if (pageResponse.StatusCode == HttpStatusCode.NotModified)
 {
     Console.WriteLine("Page not modified.");
+    Environment.Exit(isModified ? 1 : 0);
     return;
 }
 Console.WriteLine("Page modified.");
 
-await File.WriteAllTextAsync(PageHashPath, pageHash);
+if (pageResponse.Content.Headers.LastModified is not DateTimeOffset responsePageLastModified)
+    throw new InvalidOperationException("Last-Modified header not found.");
+
+await File.WriteAllTextAsync(PageLastModifiedPath, responsePageLastModified.ToString("o"));
 isModified = true;
 
 using var context = BrowsingContext.New(Configuration.Default);
 var parser = new HtmlParser();
 
-var zipUrl = "http://xml.kishou.go.jp/" + (await parser.ParseDocumentAsync(new MemoryStream(pageContent), CancellationToken.None))
+var zipUrl = "http://xml.kishou.go.jp/" + (await parser.ParseDocumentAsync(await pageResponse.Content.ReadAsStreamAsync(), CancellationToken.None))
     .QuerySelectorAll("a").Where(a => a.TextContent.Contains("個別コード表")).Select(a => a.GetAttribute("href")).First();
 
 using var zipResponse = await client.SendAsync(new(HttpMethod.Get, zipUrl)
 {
-    Headers = { IfModifiedSince = cachedLastModified },
+    Headers = { IfModifiedSince = zipLastModified },
 });
-if (zipResponse.Content.Headers.LastModified is not DateTimeOffset lastModified)
-    throw new InvalidOperationException("Last-Modified header not found.");
-
 if (zipResponse.StatusCode == HttpStatusCode.NotModified)
 {
     Console.WriteLine("Zip not modified.");
@@ -72,7 +78,10 @@ if (zipResponse.StatusCode == HttpStatusCode.NotModified)
 }
 Console.WriteLine("Zip modified.");
 
-await File.WriteAllTextAsync(ZipLastModifiedPath, lastModified.ToString("o"));
+if (zipResponse.Content.Headers.LastModified is not DateTimeOffset responseZipLastModified)
+    throw new InvalidOperationException("Last-Modified header not found.");
+
+await File.WriteAllTextAsync(ZipLastModifiedPath, responseZipLastModified.ToString("o"));
 isModified = true;
 
 using var zipStream = await zipResponse.Content.ReadAsStreamAsync();
