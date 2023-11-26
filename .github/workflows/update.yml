@@ -21,12 +21,17 @@ jobs:
         run: |
           cd JmaCodeDictionary/JmaCodeDictionaryGenerator
           dotnet run -c Release
-          if [ $? -eq 1 ]; then
+          if (git diff --shortstat | grep '[0-9]'); then
             git remote set-url origin https://github-actions:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}
             git config --global user.email "ingen188@gmail.com"
             git config --global user.name "ingen084"
+            if (git diff --name-only | grep csv); then
+              CSV_UPDATED=true
+            fi
             git add ../../csv ../../.cache
             git commit -m "Update `date '+%Y.%m.%d'`"
             git push
-            gh release create `date '+%Y.%m.%d'`
+            if [ "$CSV_UPDATED" = true ]; then
+              gh release create `date '+%Y.%m.%d'`
+            fi
           fi
