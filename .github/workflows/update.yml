@@ -34,3 +34,5 @@ jobs:
               gh release create `date '+%Y.%m.%d'`
             fi
           fi
+        env:
+          GH_TOKEN: ${{ github.token }}
