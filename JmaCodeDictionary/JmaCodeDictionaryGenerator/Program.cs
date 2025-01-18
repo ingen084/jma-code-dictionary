@@ -167,12 +167,12 @@ foreach (var entry in zipArchive.Entries)
 		else if (entry.FullName.EndsWith("AreaRiver.xls"))
 		{
 			// 指定河川洪水予報
-			await ExtractFromSheetAsync(workbook, "AreaRiver", "AreaRiver", (3, 0), 3);
+			await ExtractFromSheetAsync(workbook, "AreaRiver", "AreaRiver", (3, 0), 8);
 		}
 		else if (entry.FullName.EndsWith("WaterLevelStation.xls"))
 		{
 			// 指定河川洪水予報 水位観測所
-			await ExtractFromSheetAsync(workbook, "WaterLevelStation", "WaterLevelStation", (3, 0), 3);
+			await ExtractFromSheetAsync(workbook, "WaterLevelStation", "WaterLevelStation", (3, 0), 4);
 		}
 		else if (entry.FullName.EndsWith("AreaInformationCity-AreaForecastLocalM.xls"))
 		{
