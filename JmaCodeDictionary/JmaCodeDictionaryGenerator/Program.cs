@@ -10,7 +10,7 @@ const string CachePath = "../../.cache/";
 const string PageLastModifiedPath = CachePath + "pageLastModified.txt";
 const string ZipLastModifiedPath = CachePath + "zipLastModified.txt";
 const string XlsLastModifiedPath = CachePath + "xlsLastModified.txt";
-string basePath = $"../../csv/";
+var basePath = $"../../csv/";
 
 if (!Directory.Exists(CachePath))
 	Directory.CreateDirectory(CachePath);
