@@ -35,7 +35,7 @@ if (File.Exists(PageLastModifiedPath))
 }
 
 DateTimeOffset? xlsLastModified = null;
-if (File.Exists(ZipLastModifiedPath))
+if (File.Exists(XlsLastModifiedPath))
 {
 	if (DateTimeOffset.TryParse(await File.ReadAllTextAsync(XlsLastModifiedPath), out var c))
 		xlsLastModified = c;
