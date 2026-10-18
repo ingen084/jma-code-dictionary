@@ -52,6 +52,9 @@ if (File.Exists(ZipLastModifiedPath))
 		zipLastModified = null;
 }
 
+// コード表以外の公開データは小さいので毎回取得して生成する（変更が無ければ CSV の差分も出ない）
+await AdditionalSources.ExportAsync(url => SendAsync(url, null), basePath);
+
 using var pageResponse = await SendAsync(BaseUrl + "tec_material.html", pageLastModified);
 if (pageResponse.StatusCode == HttpStatusCode.NotModified)
 {
