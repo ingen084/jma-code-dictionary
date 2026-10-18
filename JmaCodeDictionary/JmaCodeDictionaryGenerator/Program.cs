@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Text;
 
+const string BaseUrl = "https://xml.kishou.go.jp/";
 const string CachePath = "../../.cache/";
 const string PageLastModifiedPath = CachePath + "pageLastModified.txt";
 const string ZipLastModifiedPath = CachePath + "zipLastModified.txt";
@@ -18,8 +19,9 @@ using var client = new HttpClient(new HttpClientHandler()
 	AutomaticDecompression = DecompressionMethods.All
 })
 {
-	Timeout = TimeSpan.FromSeconds(10),
+	Timeout = TimeSpan.FromMinutes(1),
 };
+client.DefaultRequestHeaders.UserAgent.ParseAdd("jma-code-dictionary (+https://github.com/ingen084/jma-code-dictionary)");
 
 var isModified = false;
 
@@ -50,10 +52,7 @@ if (File.Exists(ZipLastModifiedPath))
 		zipLastModified = null;
 }
 
-using var pageResponse = await client.SendAsync(new(HttpMethod.Get, "http://xml.kishou.go.jp/tec_material.html")
-{
-	Headers = { IfModifiedSince = pageLastModified },
-});
+using var pageResponse = await SendAsync(BaseUrl + "tec_material.html", pageLastModified);
 if (pageResponse.StatusCode == HttpStatusCode.NotModified)
 {
 	Console.WriteLine("Page not modified.");
@@ -72,12 +71,9 @@ using var context = BrowsingContext.New(Configuration.Default);
 var parser = new HtmlParser();
 var document = await parser.ParseDocumentAsync(await pageResponse.Content.ReadAsStreamAsync(), CancellationToken.None);
 
-var xlsUrl = "http://xml.kishou.go.jp/" + document.QuerySelectorAll("a").Where(a => a.TextContent.Contains("コード管理表一式")).Select(a => a.GetAttribute("href")).First();
+var xlsUrl = BaseUrl + document.QuerySelectorAll("a").Where(a => a.TextContent.Contains("コード管理表一式")).Select(a => a.GetAttribute("href")).First();
 
-using var xlsResponse = await client.SendAsync(new(HttpMethod.Get, xlsUrl)
-{
-	Headers = { IfModifiedSince = zipLastModified },
-});
+using var xlsResponse = await SendAsync(xlsUrl, zipLastModified);
 if (xlsResponse.StatusCode != HttpStatusCode.NotModified)
 {
 	Console.WriteLine("Xls modified.");
@@ -95,12 +91,9 @@ if (xlsResponse.StatusCode != HttpStatusCode.NotModified)
 else
 	Console.WriteLine("Xls not modified.");
 
-var zipUrl = "http://xml.kishou.go.jp/" + document.QuerySelectorAll("a").Where(a => a.TextContent.Contains("個別コード表")).Select(a => a.GetAttribute("href")).First();
+var zipUrl = BaseUrl + document.QuerySelectorAll("a").Where(a => a.TextContent.Contains("個別コード表")).Select(a => a.GetAttribute("href")).First();
 
-using var zipResponse = await client.SendAsync(new(HttpMethod.Get, zipUrl)
-{
-	Headers = { IfModifiedSince = zipLastModified },
-});
+using var zipResponse = await SendAsync(zipUrl, zipLastModified);
 if (zipResponse.StatusCode == HttpStatusCode.NotModified)
 {
 	Console.WriteLine("Zip not modified.");
@@ -218,6 +211,27 @@ foreach (var entry in zipArchive.Entries)
 Environment.Exit(1);
 
 // https://www.data.jma.go.jp/developer/jma_multilingual.xlsx
+
+async Task<HttpResponseMessage> SendAsync(string url, DateTimeOffset? ifModifiedSince)
+{
+	const int MaxAttempts = 3;
+	// 一時的な通信障害やタイムアウトに備えて数回リトライする
+	for (var attempt = 1; ; attempt++)
+	{
+		try
+		{
+			return await client.SendAsync(new(HttpMethod.Get, url)
+			{
+				Headers = { IfModifiedSince = ifModifiedSince },
+			});
+		}
+		catch (Exception e) when (attempt < MaxAttempts && e is HttpRequestException or TaskCanceledException)
+		{
+			Console.WriteLine($"Request failed ({attempt}/{MaxAttempts}): {url} {e.Message}");
+			await Task.Delay(TimeSpan.FromSeconds(10 * attempt));
+		}
+	}
+}
 
 async Task ExtractFromSheetAsync(XlsxWorkbook workbook, string sheetName, string name, (int Row, int Col) startPosition, int columnCount, string firstClumnsCheckForRegressionCheck)
 {

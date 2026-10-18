@@ -16,10 +16,12 @@ jobs:
           dotnet-version: 10.0.x
       - name: Run
         id: run
-        shell: bash -x {0}
+        shell: bash -xe {0}
         run: |
           cd JmaCodeDictionary/JmaCodeDictionaryGenerator
-          dotnet run -c Release
+          dotnet build -c Release
+          # 終了コード 0: 更新なし, 1: 更新あり, それ以外: エラー
+          dotnet run -c Release --no-build || [ $? -eq 1 ]
           if (git diff --shortstat | grep '[0-9]'); then
             git remote set-url origin https://github-actions:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}
             git config --global user.email "ingen188@gmail.com"
