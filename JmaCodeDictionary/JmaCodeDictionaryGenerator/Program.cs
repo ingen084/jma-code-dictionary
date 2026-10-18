@@ -6,9 +6,7 @@ using System.Text;
 
 const string BaseUrl = "https://xml.kishou.go.jp/";
 const string CachePath = "../../.cache/";
-const string PageLastModifiedPath = CachePath + "pageLastModified.txt";
-const string ZipLastModifiedPath = CachePath + "zipLastModified.txt";
-const string XlsLastModifiedPath = CachePath + "xlsLastModified.txt";
+const string LastModifiedPath = CachePath + "lastModified.json";
 var basePath = $"../../csv/";
 
 if (!Directory.Exists(CachePath))
@@ -24,51 +22,17 @@ using var client = new HttpClient(new HttpClientHandler()
 client.DefaultRequestHeaders.UserAgent.ParseAdd("jma-code-dictionary (+https://github.com/ingen084/jma-code-dictionary)");
 
 var isModified = false;
+var lastModifiedCache = await LastModifiedCache.LoadAsync(LastModifiedPath);
 
-DateTimeOffset? pageLastModified = null;
-if (File.Exists(PageLastModifiedPath))
+// コード表以外の公開データ
+await AdditionalSources.ExportAsync(GetIfModifiedAsync, basePath);
+
+using var pageResponse = await GetIfModifiedAsync("techMaterialPage", BaseUrl + "tec_material.html");
+if (pageResponse is null)
 {
-	if (DateTimeOffset.TryParse(await File.ReadAllTextAsync(PageLastModifiedPath), out var c))
-		pageLastModified = c;
-	else
-		pageLastModified = null;
-}
-
-DateTimeOffset? xlsLastModified = null;
-if (File.Exists(XlsLastModifiedPath))
-{
-	if (DateTimeOffset.TryParse(await File.ReadAllTextAsync(XlsLastModifiedPath), out var c))
-		xlsLastModified = c;
-	else
-		xlsLastModified = null;
-}
-
-DateTimeOffset? zipLastModified = null;
-if (File.Exists(ZipLastModifiedPath))
-{
-	if (DateTimeOffset.TryParse(await File.ReadAllTextAsync(ZipLastModifiedPath), out var c))
-		zipLastModified = c;
-	else
-		zipLastModified = null;
-}
-
-// コード表以外の公開データは小さいので毎回取得して生成する（変更が無ければ CSV の差分も出ない）
-await AdditionalSources.ExportAsync(url => SendAsync(url, null), basePath);
-
-using var pageResponse = await SendAsync(BaseUrl + "tec_material.html", pageLastModified);
-if (pageResponse.StatusCode == HttpStatusCode.NotModified)
-{
-	Console.WriteLine("Page not modified.");
-	Environment.Exit(isModified ? 1 : 0);
+	await ExitAsync();
 	return;
 }
-Console.WriteLine("Page modified.");
-
-if (pageResponse.Content.Headers.LastModified is not DateTimeOffset responsePageLastModified)
-	throw new InvalidOperationException("Last-Modified header not found.");
-
-await File.WriteAllTextAsync(PageLastModifiedPath, responsePageLastModified.ToString("o"));
-isModified = true;
 
 using var context = BrowsingContext.New(Configuration.Default);
 var parser = new HtmlParser();
@@ -76,40 +40,22 @@ var document = await parser.ParseDocumentAsync(await pageResponse.Content.ReadAs
 
 var xlsUrl = BaseUrl + document.QuerySelectorAll("a").Where(a => a.TextContent.Contains("コード管理表一式")).Select(a => a.GetAttribute("href")).First();
 
-using var xlsResponse = await SendAsync(xlsUrl, zipLastModified);
-if (xlsResponse.StatusCode != HttpStatusCode.NotModified)
+using var xlsResponse = await GetIfModifiedAsync("codeManagementTable", xlsUrl);
+if (xlsResponse is not null)
 {
-	Console.WriteLine("Xls modified.");
-
-	if (xlsResponse.Content.Headers.LastModified is not DateTimeOffset responseXlsLastModified)
-		throw new InvalidOperationException("Last-Modified header not found.");
-
-	await File.WriteAllTextAsync(XlsLastModifiedPath, responseXlsLastModified.ToString("o"));
-	isModified = true;
-
 	using var stream = await xlsResponse.Content.ReadAsStreamAsync();
 	using var workbook = XlsxWorkbook.Open(stream);
 	await ProcessCodesAsync(workbook);
 }
-else
-	Console.WriteLine("Xls not modified.");
 
 var zipUrl = BaseUrl + document.QuerySelectorAll("a").Where(a => a.TextContent.Contains("個別コード表")).Select(a => a.GetAttribute("href")).First();
 
-using var zipResponse = await SendAsync(zipUrl, zipLastModified);
-if (zipResponse.StatusCode == HttpStatusCode.NotModified)
+using var zipResponse = await GetIfModifiedAsync("individualCodeTables", zipUrl);
+if (zipResponse is null)
 {
-	Console.WriteLine("Zip not modified.");
-	Environment.Exit(isModified ? 1 : 0);
+	await ExitAsync();
 	return;
 }
-Console.WriteLine("Zip modified.");
-
-if (zipResponse.Content.Headers.LastModified is not DateTimeOffset responseZipLastModified)
-	throw new InvalidOperationException("Last-Modified header not found.");
-
-await File.WriteAllTextAsync(ZipLastModifiedPath, responseZipLastModified.ToString("o"));
-isModified = true;
 
 using var zipStream = await zipResponse.Content.ReadAsStreamAsync();
 // エントリ名が UTF-8 になったため
@@ -211,9 +157,36 @@ foreach (var entry in zipArchive.Entries)
 		await ExtractFromSheetAsync(workbook, "82 ", "PointVolcano", (3, 0), 4, "101");
 	}
 }
-Environment.Exit(1);
+await ExitAsync();
 
-// https://www.data.jma.go.jp/developer/jma_multilingual.xlsx
+// 取得元ごとの Last-Modified を保存して終了する（終了コード 0: 更新なし, 1: 更新あり）
+async Task ExitAsync()
+{
+	await lastModifiedCache.SaveAsync();
+	Environment.Exit(isModified ? 1 : 0);
+}
+
+// 前回の取得から更新されていれば応答を、更新されていなければ null を返す
+async Task<HttpResponseMessage?> GetIfModifiedAsync(string key, string url)
+{
+	var response = await SendAsync(url, lastModifiedCache.Get(key, url));
+	if (response.StatusCode == HttpStatusCode.NotModified)
+	{
+		Console.WriteLine($"Not modified: {key}");
+		response.Dispose();
+		return null;
+	}
+	response.EnsureSuccessStatusCode();
+	Console.WriteLine($"Modified: {key}");
+
+	if (response.Content.Headers.LastModified is not DateTimeOffset lastModified)
+		throw new InvalidOperationException($"Last-Modified header not found: {url}");
+
+	// 途中で失敗したときに更新済みとして残らないよう、保存は ExitAsync でまとめて行う
+	lastModifiedCache.Set(key, url, lastModified);
+	isModified = true;
+	return response;
+}
 
 async Task<HttpResponseMessage> SendAsync(string url, DateTimeOffset? ifModifiedSince)
 {

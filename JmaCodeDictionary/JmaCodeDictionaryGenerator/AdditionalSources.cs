@@ -2,31 +2,51 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text.Json;
 
+// 前回の取得から更新されていれば応答を、更新されていなければ null を返す
+public delegate Task<HttpResponseMessage?> GetIfModified(string key, string url);
+
 // 防災情報XMLのコード表以外の公開データから CSV を生成する
 public static class AdditionalSources
 {
 	private const string BosaiUrl = "https://www.jma.go.jp/bosai/";
 	private const string BulletinUrl = "https://www.data.jma.go.jp/eqev/data/bulletin/";
+	private const string DeveloperUrl = "https://www.data.jma.go.jp/developer/";
 
-	public static async Task ExportAsync(Func<string, Task<HttpResponseMessage>> getAsync, string basePath)
+	// 多言語辞書の見出し。CSV にはヘッダー行を出力しないので、列の並びが変わっていないか確認する
+	private static readonly string[] MultilingualColumns =
+	[
+		"No.", "種別", "情報種別等", "日本語",
+		"英語", "中国語(簡体字)", "中国語(繁体字)", "韓国語", "ポルトガル語", "スペイン語", "インドネシア語",
+		"ベトナム語", "タガログ語", "タイ語", "ネパール語", "クメール語", "ビルマ語", "モンゴル語",
+		"備考", "XMLコード表", "コード", "更新履歴",
+	];
+
+	public static async Task ExportAsync(GetIfModified getIfModified, string basePath)
 	{
 		// 防災情報 (bosai) の JSON
 		var webJsonPath = basePath + "web-json/";
 		Directory.CreateDirectory(webJsonPath);
-		await ExportVolcanoAsync(getAsync, webJsonPath + "Volcano.csv");
-		await ExportTideLevelStationAsync(getAsync, webJsonPath + "TideLevelStation.csv");
-		await ExportWindProfilerStationAsync(getAsync, webJsonPath + "WindProfilerStation.csv");
+		await ExportVolcanoAsync(getIfModified, webJsonPath + "Volcano.csv");
+		await ExportTideLevelStationAsync(getIfModified, webJsonPath + "TideLevelStation.csv");
+		await ExportWindProfilerStationAsync(getIfModified, webJsonPath + "WindProfilerStation.csv");
 
 		// 地震月報（カタログ編）
 		var bulletinPath = basePath + "bulletin/";
 		Directory.CreateDirectory(bulletinPath);
-		await ExportSeismicStationAsync(getAsync, bulletinPath + "SeismicStation.csv");
+		await ExportSeismicStationAsync(getIfModified, bulletinPath + "SeismicStation.csv");
+
+		// 多言語辞書
+		var multilingualPath = basePath + "multilingual/";
+		Directory.CreateDirectory(multilingualPath);
+		await ExportMultilingualDictionaryAsync(getIfModified, multilingualPath + "MultilingualDictionary.csv");
 	}
 
 	// 火山
-	private static async Task ExportVolcanoAsync(Func<string, Task<HttpResponseMessage>> getAsync, string csvPath)
+	private static async Task ExportVolcanoAsync(GetIfModified getIfModified, string csvPath)
 	{
-		using var json = await GetJsonAsync(getAsync, BosaiUrl + "volcano/const/volcano_list.json");
+		using var json = await GetJsonAsync(getIfModified, "volcano", BosaiUrl + "volcano/const/volcano_list.json");
+		if (json is null)
+			return;
 		await WriteCsvAsync(csvPath, json.RootElement.EnumerateArray().Select(volcano =>
 		{
 			var latLon = volcano.Property("latlon");
@@ -43,9 +63,11 @@ public static class AdditionalSources
 	}
 
 	// 潮位観測点
-	private static async Task ExportTideLevelStationAsync(Func<string, Task<HttpResponseMessage>> getAsync, string csvPath)
+	private static async Task ExportTideLevelStationAsync(GetIfModified getIfModified, string csvPath)
 	{
-		using var json = await GetJsonAsync(getAsync, BosaiUrl + "tidelevel/const/tide_area.json");
+		using var json = await GetJsonAsync(getIfModified, "tideLevelStation", BosaiUrl + "tidelevel/const/tide_area.json");
+		if (json is null)
+			return;
 		var stations = json.RootElement.EnumerateObject()
 			.SelectMany(area => area.Value.GetProperty("class30s").EnumerateArray())
 			.SelectMany(class30 => class30.Property("stations")?.EnumerateArray() ?? Enumerable.Empty<JsonElement>());
@@ -75,9 +97,11 @@ public static class AdditionalSources
 	}
 
 	// ウィンドプロファイラ観測局
-	private static async Task ExportWindProfilerStationAsync(Func<string, Task<HttpResponseMessage>> getAsync, string csvPath)
+	private static async Task ExportWindProfilerStationAsync(GetIfModified getIfModified, string csvPath)
 	{
-		using var json = await GetJsonAsync(getAsync, BosaiUrl + "windprofiler/const/station.json");
+		using var json = await GetJsonAsync(getIfModified, "windProfilerStation", BosaiUrl + "windprofiler/const/station.json");
+		if (json is null)
+			return;
 		await WriteCsvAsync(csvPath, json.RootElement.EnumerateObject().Select(station => new[]
 		{
 			station.Name,
@@ -90,9 +114,11 @@ public static class AdditionalSources
 	}
 
 	// 地震観測地点ファイル (固定長: https://www.data.jma.go.jp/eqev/data/bulletin/data/format/stnfmt_j.html)
-	private static async Task ExportSeismicStationAsync(Func<string, Task<HttpResponseMessage>> getAsync, string csvPath)
+	private static async Task ExportSeismicStationAsync(GetIfModified getIfModified, string csvPath)
 	{
-		using var response = await GetAsync(getAsync, BulletinUrl + "data/deck/stations.zip");
+		using var response = await getIfModified("seismicStation", BulletinUrl + "data/deck/stations.zip");
+		if (response is null)
+			return;
 		using var zipArchive = new ZipArchive(await response.Content.ReadAsStreamAsync(), ZipArchiveMode.Read);
 		var entry = zipArchive.Entries.Single();
 		using var reader = new StreamReader(entry.Open());
@@ -118,6 +144,35 @@ public static class AdditionalSources
 		await WriteCsvAsync(csvPath, rows);
 	}
 
+	// 多言語辞書 (https://www.data.jma.go.jp/developer/multilingual.html)
+	private static async Task ExportMultilingualDictionaryAsync(GetIfModified getIfModified, string csvPath)
+	{
+		using var response = await getIfModified("multilingual", DeveloperUrl + "jma_multilingual.xlsx");
+		if (response is null)
+			return;
+		using var stream = await response.Content.ReadAsStreamAsync();
+		using var workbook = XlsxWorkbook.Open(stream);
+		const string SheetName = "多言語辞書（本体）";
+		var sheet = workbook.GetSheet(SheetName) ?? throw new InvalidOperationException($"Sheet {SheetName} not found.");
+
+		// 列の追加・並べ替えで値がずれたまま出力されないようにする
+		var header = sheet.GetRow(0);
+		var actualColumns = Enumerable.Range(0, MultilingualColumns.Length + 1).Select(j => header?.GetCell(j)?.Value?.Trim() ?? "");
+		if (!actualColumns.SequenceEqual(MultilingualColumns.Append("")))
+			throw new InvalidOperationException($"Unexpected columns in {SheetName}: {string.Join(", ", actualColumns)}");
+
+		var rows = new List<string?[]>();
+		for (var i = 1; i <= sheet.LastRowNum; i++)
+		{
+			var row = sheet.GetRow(i);
+			if (row is null || string.IsNullOrWhiteSpace(row.GetCell(0)?.Value))
+				continue;
+			// コード表の CSV と同じく前後の空白を除く。コードは先頭の 0 が欠けていても元データのまま出力する
+			rows.Add([.. Enumerable.Range(0, MultilingualColumns.Length).Select(j => row.GetCell(j)?.Value?.Trim())]);
+		}
+		await WriteCsvAsync(csvPath, rows);
+	}
+
 	private static string ParseFixedInteger(string field)
 		=> int.Parse(field, NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture);
 
@@ -131,17 +186,10 @@ public static class AdditionalSources
 		return value.ToString("F" + decimals, CultureInfo.InvariantCulture);
 	}
 
-	private static async Task<HttpResponseMessage> GetAsync(Func<string, Task<HttpResponseMessage>> getAsync, string url)
+	private static async Task<JsonDocument?> GetJsonAsync(GetIfModified getIfModified, string key, string url)
 	{
-		var response = await getAsync(url);
-		response.EnsureSuccessStatusCode();
-		return response;
-	}
-
-	private static async Task<JsonDocument> GetJsonAsync(Func<string, Task<HttpResponseMessage>> getAsync, string url)
-	{
-		using var response = await GetAsync(getAsync, url);
-		return await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+		using var response = await getIfModified(key, url);
+		return response is null ? null : await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
 	}
 
 	// 既存のコード表の CSV と同じ規則で書き出す
