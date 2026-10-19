@@ -164,7 +164,10 @@ await ExitAsync();
 async Task ExitAsync()
 {
 	// 加工の処理を変えたときにも反映されるよう、元の CSV が更新されていなくても毎回作り直す
+	// 生成しなかった場合もワークフローの git add が失敗しないよう、ディレクトリは作っておく
+	Directory.CreateDirectory(DerivedPath);
 	await TsunamiStationLocation.ExportAsync(basePath, DerivedPath + "TsunamiStationLocation.csv");
+	await NwptaForecastPoint.ExportAsync(basePath, DerivedPath + "NwptaForecastPoint.csv");
 	await lastModifiedCache.SaveAsync();
 	Environment.Exit(isModified ? 1 : 0);
 }

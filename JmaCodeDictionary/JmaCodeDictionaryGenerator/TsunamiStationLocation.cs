@@ -22,9 +22,6 @@ public static partial class TsunamiStationLocation
 
 	public static async Task ExportAsync(string basePath, string csvPath)
 	{
-		// 生成しなかった場合もワークフローの git add が失敗しないよう、ディレクトリは作っておく
-		Directory.CreateDirectory(Path.GetDirectoryName(csvPath)!);
-
 		var pointTsunamiPath = basePath + "PointTsunami.csv";
 		var tideLevelStationPath = basePath + "web-json/TideLevelStation.csv";
 		var seismicStationPath = basePath + "bulletin/SeismicStation.csv";
