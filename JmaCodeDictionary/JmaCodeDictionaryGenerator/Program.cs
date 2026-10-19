@@ -7,6 +7,7 @@ using System.Text;
 const string BaseUrl = "https://xml.kishou.go.jp/";
 const string CachePath = "../../.cache/";
 const string LastModifiedPath = CachePath + "lastModified.json";
+const string DerivedPath = "../../derived/";
 var basePath = $"../../csv/";
 
 if (!Directory.Exists(CachePath))
@@ -159,9 +160,11 @@ foreach (var entry in zipArchive.Entries)
 }
 await ExitAsync();
 
-// 取得元ごとの Last-Modified を保存して終了する（終了コード 0: 更新なし, 1: 更新あり）
+// 加工データを作り直し、取得元ごとの Last-Modified を保存して終了する（終了コード 0: 更新なし, 1: 更新あり）
 async Task ExitAsync()
 {
+	// 加工の処理を変えたときにも反映されるよう、元の CSV が更新されていなくても毎回作り直す
+	await TsunamiStationLocation.ExportAsync(basePath, DerivedPath + "TsunamiStationLocation.csv");
 	await lastModifiedCache.SaveAsync();
 	Environment.Exit(isModified ? 1 : 0);
 }
