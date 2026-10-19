@@ -1,0 +1,34 @@
+{
+  "codeManagementTable": {
+    "url": "https://xml.kishou.go.jp/jmaxml_20261007_code.xlsx",
+    "lastModified": "2026-10-02T06:22:07+00:00"
+  },
+  "individualCodeTables": {
+    "url": "https://xml.kishou.go.jp/jmaxml_20261007_Code.zip",
+    "lastModified": "2026-10-02T06:22:07+00:00"
+  },
+  "multilingual": {
+    "url": "https://www.data.jma.go.jp/developer/jma_multilingual.xlsx",
+    "lastModified": "2026-03-26T01:33:26+00:00"
+  },
+  "seismicStation": {
+    "url": "https://www.data.jma.go.jp/eqev/data/bulletin/data/deck/stations.zip",
+    "lastModified": "2026-09-24T07:37:18+00:00"
+  },
+  "techMaterialPage": {
+    "url": "https://xml.kishou.go.jp/tec_material.html",
+    "lastModified": "2026-10-09T04:20:06+00:00"
+  },
+  "tideLevelStation": {
+    "url": "https://www.jma.go.jp/bosai/tidelevel/const/tide_area.json",
+    "lastModified": "2026-10-15T04:10:05+00:00"
+  },
+  "volcano": {
+    "url": "https://www.jma.go.jp/bosai/volcano/const/volcano_list.json",
+    "lastModified": "2026-09-29T04:55:04+00:00"
+  },
+  "windProfilerStation": {
+    "url": "https://www.jma.go.jp/bosai/windprofiler/const/station.json",
+    "lastModified": "2026-10-15T04:10:07+00:00"
+  }
+}
