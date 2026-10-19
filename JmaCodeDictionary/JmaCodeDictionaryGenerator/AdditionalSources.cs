@@ -1,3 +1,6 @@
+using AngleSharp.Dom;
+using AngleSharp.Html.Dom;
+using AngleSharp.Html.Parser;
 using System.Globalization;
 using System.IO.Compression;
 using System.Text.Json;
@@ -11,6 +14,10 @@ public static class AdditionalSources
 	private const string BosaiUrl = "https://www.jma.go.jp/bosai/";
 	private const string BulletinUrl = "https://www.data.jma.go.jp/eqev/data/bulletin/";
 	private const string DeveloperUrl = "https://www.data.jma.go.jp/developer/";
+	private const string NwptacUrl = "https://www.data.jma.go.jp/eqev/data/nwptac/";
+
+	// 北西太平洋津波情報の予報地点の表の見出し
+	private static readonly string[] ForecastPointColumns = ["Coastal Block", "Forecast Point", "Latitude", "Longitude", "Number in Fig."];
 
 	// 多言語辞書の見出し。CSV にはヘッダー行を出力しないので、列の並びが変わっていないか確認する
 	private static readonly string[] MultilingualColumns =
@@ -39,6 +46,11 @@ public static class AdditionalSources
 		var multilingualPath = basePath + "multilingual/";
 		Directory.CreateDirectory(multilingualPath);
 		await ExportMultilingualDictionaryAsync(getIfModified, multilingualPath + "MultilingualDictionary.csv");
+
+		// 北西太平洋津波情報センター
+		var nwptacPath = basePath + "nwptac/";
+		Directory.CreateDirectory(nwptacPath);
+		await ExportForecastPointAsync(getIfModified, nwptacPath + "ForecastPoint.csv");
 	}
 
 	// 火山
@@ -172,6 +184,51 @@ public static class AdditionalSources
 		}
 		await WriteCsvAsync(csvPath, rows);
 	}
+
+	// 北西太平洋津波情報の予報地点 (HTML の表)
+	private static async Task ExportForecastPointAsync(GetIfModified getIfModified, string csvPath)
+	{
+		const string Url = NwptacUrl + "forecastpoint.html";
+		using var response = await getIfModified("nwptacForecastPoint", Url);
+		if (response is null)
+			return;
+		var document = await new HtmlParser().ParseDocumentAsync(await response.Content.ReadAsStreamAsync(), CancellationToken.None);
+		var table = document.QuerySelectorAll<IHtmlTableElement>("table")
+			.FirstOrDefault(t => t.Rows.FirstOrDefault()?.Cells.Any(c => CellText(c) == "Forecast Point") == true)
+			?? throw new InvalidOperationException($"Forecast point table not found: {Url}");
+
+		var actualColumns = table.Rows[0].Cells.Select(CellText);
+		if (!actualColumns.SequenceEqual(ForecastPointColumns))
+			throw new InvalidOperationException($"Unexpected columns in {Url}: {string.Join(", ", actualColumns)}");
+
+		// 海岸ブロックの列は rowspan でまとめられているので、各行に展開する
+		var rows = new List<string?[]>();
+		string? block = null;
+		var blockRows = 0;
+		foreach (var row in table.Rows.Skip(1))
+		{
+			var cells = row.Cells.ToArray();
+			if (blockRows == 0)
+			{
+				if (cells.Length != ForecastPointColumns.Length)
+					throw new InvalidDataException($"Unexpected row in {Url}: {row.TextContent}");
+				block = CellText(cells[0]);
+				blockRows = cells[0].RowSpan;
+				cells = cells[1..];
+			}
+			else if (cells.Length != ForecastPointColumns.Length - 1)
+				throw new InvalidDataException($"Unexpected row in {Url}: {row.TextContent}");
+			blockRows--;
+			rows.Add([block, .. cells.Select(CellText)]);
+		}
+		if (rows.Count == 0 || blockRows != 0)
+			throw new InvalidDataException($"Unexpected rows in {Url}");
+		await WriteCsvAsync(csvPath, rows);
+	}
+
+	// 改行やタグによる空白をまとめる
+	private static string CellText(IElement cell)
+		=> string.Join(' ', cell.TextContent.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
 	private static string ParseFixedInteger(string field)
 		=> int.Parse(field, NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture);

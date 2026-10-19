@@ -12,6 +12,7 @@
 | `csv/web-json/` | 気象庁ホームページの「防災情報」で使用されている JSON | [気象庁 防災情報](https://www.jma.go.jp/bosai/) |
 | `csv/bulletin/` | 地震月報（カタログ編）の資料 | [地震月報（カタログ編） 検測値データ](https://www.data.jma.go.jp/eqev/data/bulletin/deck.html) |
 | `csv/multilingual/` | 気象情報等で用いる用語の多言語辞書 | [多言語辞書データ](https://www.data.jma.go.jp/developer/multilingual.html) |
+| `csv/nwptac/` | 北西太平洋津波情報センター（NWPTAC）の資料 | [NWPTA Forecast Points](https://www.data.jma.go.jp/eqev/data/nwptac/forecastpoint.html) |
 
 `csv/web-json/` の元になっている JSON は仕様が公開されていないため、予告なく構造や URL が変わる可能性があります。
 
@@ -158,6 +159,21 @@
 - 同じコードに複数の行があることがあります（例: `1036600` の「上野村」と「群馬上野村」）。コードと日本語（4列目）の両方で照合してください。
 - 現在のコード表に無いコード（浜松市の再編前の区など）を含みます。
 - 「更新履歴」シートは出力していません。更新の内容は出典のページを参照してください。
+
+### `csv/nwptac/ForecastPoint.csv` 北西太平洋津波情報の予報地点
+
+出典: https://www.data.jma.go.jp/eqev/data/nwptac/forecastpoint.html （「NWPTA FORECAST POINTS AND COASTAL BLOCKS」の表）
+
+| 列 | 内容 | 元の項目 |
+|---|---|---|
+| 1 | 沿岸ブロック | `Coastal Block` |
+| 2 | 予報地点 | `Forecast Point` |
+| 3 | 緯度（例: `58.8N`, `00.8S`） | `Latitude` |
+| 4 | 経度（例: `164.5E`） | `Longitude` |
+| 5 | ページの図の番号 | `Number in Fig.` |
+
+- 元の表では沿岸ブロックのセルが複数の行にまたがっているため、各行に同じ値を出力しています。
+- 緯度・経度は表の表記のまま出力しています。[NWPTA のテンプレート](https://www.data.jma.go.jp/eqev/data/nwptac/nwpta.html)にある電文の形式（`LL.L{N/S} LLL.LE`）と同じで、先頭の 0 も付いています。
 
 ## ライセンス
 
