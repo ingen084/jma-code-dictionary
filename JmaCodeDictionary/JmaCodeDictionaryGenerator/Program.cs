@@ -130,8 +130,8 @@ foreach (var entry in zipArchive.Entries)
 	}
 	else if (entry.FullName.EndsWith("PointAmedas.xlsx"))
 	{
-		await ExtractAmedasFromSheetAsync(workbook, "ame_master", "AmedasRainPoint", (2, 0), 16);
-		await ExtractFromSheetAsync(workbook, "snow_master", "AmedasSnowPoint", (2, 0), 12, "宗谷");
+		await ExtractAmedasFromSheetAsync(workbook, "ame_master", "AmedasRainPoint", (2, 0), 18);
+		await ExtractFromSheetAsync(workbook, "snow_master", "AmedasSnowPoint", (2, 0), 14, "宗谷");
 	}
 	else if (entry.FullName.EndsWith("地震火山関連コード表.xlsx"))
 	{
