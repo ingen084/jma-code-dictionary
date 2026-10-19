@@ -22,14 +22,15 @@ jobs:
           dotnet build -c Release
           # 終了コード 0: 更新なし, 1: 更新あり, それ以外: エラー
           dotnet run -c Release --no-build || [ $? -eq 1 ]
-          if (git diff --shortstat | grep '[0-9]'); then
+          # 新しく追加された CSV も検知できるよう、ステージしてから差分を確認する
+          git add ../../csv ../../.cache
+          if ! git diff --cached --quiet; then
             git remote set-url origin https://github-actions:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}
             git config --global user.email "ingen188@gmail.com"
             git config --global user.name "ingen084"
-            if (git diff --name-only | grep csv); then
+            if ! git diff --cached --quiet -- ../../csv; then
               CSV_UPDATED=true
             fi
-            git add ../../csv ../../.cache
             git commit -m "Update `date '+%Y.%m.%d'`"
             git push
             if [ "$CSV_UPDATED" = true ]; then
