@@ -21,7 +21,7 @@
   },
   "tideLevelStation": {
     "url": "https://www.jma.go.jp/bosai/tidelevel/const/tide_area.json",
-    "lastModified": "2026-10-20T02:07:20+00:00"
+    "lastModified": "2026-10-22T06:41:12+00:00"
   },
   "volcano": {
     "url": "https://www.jma.go.jp/bosai/volcano/const/volcano_list.json",
