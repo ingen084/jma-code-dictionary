@@ -7,6 +7,7 @@ using System.Text;
 const string BaseUrl = "https://xml.kishou.go.jp/";
 const string CachePath = "../../.cache/";
 const string LastModifiedPath = CachePath + "lastModified.json";
+const string DerivedPath = "../../derived/";
 var basePath = $"../../csv/";
 
 if (!Directory.Exists(CachePath))
@@ -129,8 +130,8 @@ foreach (var entry in zipArchive.Entries)
 	}
 	else if (entry.FullName.EndsWith("PointAmedas.xlsx"))
 	{
-		await ExtractAmedasFromSheetAsync(workbook, "ame_master", "AmedasRainPoint", (2, 0), 16);
-		await ExtractFromSheetAsync(workbook, "snow_master", "AmedasSnowPoint", (2, 0), 12, "宗谷");
+		await ExtractAmedasFromSheetAsync(workbook, "ame_master", "AmedasRainPoint", (2, 0), 18);
+		await ExtractFromSheetAsync(workbook, "snow_master", "AmedasSnowPoint", (2, 0), 14, "宗谷");
 	}
 	else if (entry.FullName.EndsWith("地震火山関連コード表.xlsx"))
 	{
@@ -159,9 +160,14 @@ foreach (var entry in zipArchive.Entries)
 }
 await ExitAsync();
 
-// 取得元ごとの Last-Modified を保存して終了する（終了コード 0: 更新なし, 1: 更新あり）
+// 加工データを作り直し、取得元ごとの Last-Modified を保存して終了する（終了コード 0: 更新なし, 1: 更新あり）
 async Task ExitAsync()
 {
+	// 加工の処理を変えたときにも反映されるよう、元の CSV が更新されていなくても毎回作り直す
+	// 生成しなかった場合もワークフローの git add が失敗しないよう、ディレクトリは作っておく
+	Directory.CreateDirectory(DerivedPath);
+	await TsunamiStationLocation.ExportAsync(basePath, DerivedPath + "TsunamiStationLocation.csv");
+	await NwptaForecastPoint.ExportAsync(basePath, DerivedPath + "NwptaForecastPoint.csv");
 	await lastModifiedCache.SaveAsync();
 	Environment.Exit(isModified ? 1 : 0);
 }

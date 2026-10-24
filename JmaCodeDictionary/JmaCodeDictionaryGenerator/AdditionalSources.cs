@@ -1,16 +1,28 @@
+using AngleSharp.Dom;
+using AngleSharp.Html.Dom;
+using AngleSharp.Html.Parser;
 using System.Globalization;
 using System.IO.Compression;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 // 前回の取得から更新されていれば応答を、更新されていなければ null を返す
 public delegate Task<HttpResponseMessage?> GetIfModified(string key, string url);
 
 // 防災情報XMLのコード表以外の公開データから CSV を生成する
-public static class AdditionalSources
+public static partial class AdditionalSources
 {
 	private const string BosaiUrl = "https://www.jma.go.jp/bosai/";
 	private const string BulletinUrl = "https://www.data.jma.go.jp/eqev/data/bulletin/";
 	private const string DeveloperUrl = "https://www.data.jma.go.jp/developer/";
+	private const string NwptacUrl = "https://www.data.jma.go.jp/eqev/data/nwptac/";
+	private const string TsunamiMapUrl = "https://www.jma.go.jp/jma/kishou/know/jishin/tsunamimap/";
+
+	// 津波観測点の地図の地域ごとのページ
+	private static readonly string[] TsunamiMapPages = ["Hokkaidou", "Tohoku", "Kanto", "Tokai", "Hokuriku", "Kinki", "Chugoku", "Shikoku", "Kyushu", "Nansei"];
+
+	// 北西太平洋津波情報の予報地点の表の見出し
+	private static readonly string[] ForecastPointColumns = ["Coastal Block", "Forecast Point", "Latitude", "Longitude", "Number in Fig."];
 
 	// 多言語辞書の見出し。CSV にはヘッダー行を出力しないので、列の並びが変わっていないか確認する
 	private static readonly string[] MultilingualColumns =
@@ -39,6 +51,17 @@ public static class AdditionalSources
 		var multilingualPath = basePath + "multilingual/";
 		Directory.CreateDirectory(multilingualPath);
 		await ExportMultilingualDictionaryAsync(getIfModified, multilingualPath + "MultilingualDictionary.csv");
+
+		// 北西太平洋津波情報センター
+		var nwptacPath = basePath + "nwptac/";
+		Directory.CreateDirectory(nwptacPath);
+		await ExportForecastPointAsync(getIfModified, nwptacPath + "ForecastPoint.csv");
+
+		// 津波観測点の地図
+		var tsunamiMapPath = basePath + "tsunamimap/";
+		Directory.CreateDirectory(tsunamiMapPath);
+		foreach (var page in TsunamiMapPages)
+			await ExportTsunamiMapAsync(getIfModified, page, tsunamiMapPath + page + ".csv");
 	}
 
 	// 火山
@@ -47,7 +70,7 @@ public static class AdditionalSources
 		using var json = await GetJsonAsync(getIfModified, "volcano", BosaiUrl + "volcano/const/volcano_list.json");
 		if (json is null)
 			return;
-		await WriteCsvAsync(csvPath, json.RootElement.EnumerateArray().Select(volcano =>
+		await CsvFile.WriteAsync(csvPath, json.RootElement.EnumerateArray().Select(volcano =>
 		{
 			var latLon = volcano.Property("latlon");
 			return new[]
@@ -71,7 +94,7 @@ public static class AdditionalSources
 		var stations = json.RootElement.EnumerateObject()
 			.SelectMany(area => area.Value.GetProperty("class30s").EnumerateArray())
 			.SelectMany(class30 => class30.Property("stations")?.EnumerateArray() ?? Enumerable.Empty<JsonElement>());
-		await WriteCsvAsync(csvPath, stations.Select(station => new[]
+		await CsvFile.WriteAsync(csvPath, stations.Select(station => new[]
 		{
 			station.Property("code").Text(),
 			station.Property("name").Text(),
@@ -102,7 +125,7 @@ public static class AdditionalSources
 		using var json = await GetJsonAsync(getIfModified, "windProfilerStation", BosaiUrl + "windprofiler/const/station.json");
 		if (json is null)
 			return;
-		await WriteCsvAsync(csvPath, json.RootElement.EnumerateObject().Select(station => new[]
+		await CsvFile.WriteAsync(csvPath, json.RootElement.EnumerateObject().Select(station => new[]
 		{
 			station.Name,
 			station.Value.Property("jpname").Text(),
@@ -141,7 +164,7 @@ public static class AdditionalSources
 				ParseFixedInteger(line[27..31]),
 			]);
 		}
-		await WriteCsvAsync(csvPath, rows);
+		await CsvFile.WriteAsync(csvPath, rows);
 	}
 
 	// 多言語辞書 (https://www.data.jma.go.jp/developer/multilingual.html)
@@ -170,8 +193,81 @@ public static class AdditionalSources
 			// コード表の CSV と同じく前後の空白を除く。コードは先頭の 0 が欠けていても元データのまま出力する
 			rows.Add([.. Enumerable.Range(0, MultilingualColumns.Length).Select(j => row.GetCell(j)?.Value?.Trim())]);
 		}
-		await WriteCsvAsync(csvPath, rows);
+		await CsvFile.WriteAsync(csvPath, rows);
 	}
+
+	// 北西太平洋津波情報の予報地点 (HTML の表)
+	private static async Task ExportForecastPointAsync(GetIfModified getIfModified, string csvPath)
+	{
+		const string Url = NwptacUrl + "forecastpoint.html";
+		using var response = await getIfModified("nwptacForecastPoint", Url);
+		if (response is null)
+			return;
+		var document = await new HtmlParser().ParseDocumentAsync(await response.Content.ReadAsStreamAsync(), CancellationToken.None);
+		var table = document.QuerySelectorAll<IHtmlTableElement>("table")
+			.FirstOrDefault(t => t.Rows.FirstOrDefault()?.Cells.Any(c => CellText(c) == "Forecast Point") == true)
+			?? throw new InvalidOperationException($"Forecast point table not found: {Url}");
+
+		var actualColumns = table.Rows[0].Cells.Select(CellText);
+		if (!actualColumns.SequenceEqual(ForecastPointColumns))
+			throw new InvalidOperationException($"Unexpected columns in {Url}: {string.Join(", ", actualColumns)}");
+
+		// 海岸ブロックの列は rowspan でまとめられているので、各行に展開する
+		var rows = new List<string?[]>();
+		string? block = null;
+		var blockRows = 0;
+		foreach (var row in table.Rows.Skip(1))
+		{
+			var cells = row.Cells.ToArray();
+			if (blockRows == 0)
+			{
+				if (cells.Length != ForecastPointColumns.Length)
+					throw new InvalidDataException($"Unexpected row in {Url}: {row.TextContent}");
+				block = CellText(cells[0]);
+				blockRows = cells[0].RowSpan;
+				cells = cells[1..];
+			}
+			else if (cells.Length != ForecastPointColumns.Length - 1)
+				throw new InvalidDataException($"Unexpected row in {Url}: {row.TextContent}");
+			blockRows--;
+			rows.Add([block, .. cells.Select(CellText)]);
+		}
+		if (rows.Count == 0 || blockRows != 0)
+			throw new InvalidDataException($"Unexpected rows in {Url}");
+		await CsvFile.WriteAsync(csvPath, rows);
+	}
+
+	// 津波観測点の地図 (画像上の観測点の位置が area 要素の座標になっている)
+	private static async Task ExportTsunamiMapAsync(GetIfModified getIfModified, string page, string csvPath)
+	{
+		var url = TsunamiMapUrl + page + ".html";
+		using var response = await getIfModified("tsunamiMap" + page, url);
+		if (response is null)
+			return;
+		var document = await new HtmlParser().ParseDocumentAsync(await response.Content.ReadAsStreamAsync(), CancellationToken.None);
+
+		var rows = new List<string?[]>();
+		// 他の地域のページへのリンクは除く
+		foreach (var area in document.QuerySelectorAll("area").Where(a => !a.HasAttribute("href")))
+		{
+			// title は「観測点名（所属機関）」
+			var title = TsunamiMapTitleRegex().Match(area.GetAttribute("title") ?? "");
+			var coords = (area.GetAttribute("coords") ?? "").Split(',').Select(c => c.Trim()).ToArray();
+			if (area.GetAttribute("shape") != "rect" || !title.Success || coords.Length != 4 || !coords.All(c => int.TryParse(c, out _)))
+				throw new InvalidDataException($"Unexpected area in {url}: {area.OuterHtml}");
+			rows.Add([title.Groups[1].Value, title.Groups[2].Value, .. coords]);
+		}
+		if (rows.Count == 0)
+			throw new InvalidDataException($"No stations in {url}");
+		await CsvFile.WriteAsync(csvPath, rows);
+	}
+
+	[GeneratedRegex(@"^(.+)（([^（）]+)）$")]
+	private static partial Regex TsunamiMapTitleRegex();
+
+	// 改行やタグによる空白をまとめる
+	private static string CellText(IElement cell)
+		=> string.Join(' ', cell.TextContent.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
 	private static string ParseFixedInteger(string field)
 		=> int.Parse(field, NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture);
@@ -190,24 +286,6 @@ public static class AdditionalSources
 	{
 		using var response = await getIfModified(key, url);
 		return response is null ? null : await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-	}
-
-	// 既存のコード表の CSV と同じ規則で書き出す
-	private static async Task WriteCsvAsync(string csvPath, IEnumerable<IEnumerable<string?>> rows)
-	{
-		using var csvWriter = new StreamWriter(csvPath, false) { NewLine = "\n" };
-		foreach (var row in rows)
-			await csvWriter.WriteLineAsync(string.Join(',', row.Select(EscapeCsvValue)));
-	}
-
-	private static string EscapeCsvValue(string? value)
-	{
-		value ??= "";
-		if (value.Contains('\n'))
-			value = value.Replace("\r\n", "\n").Replace("\n", "\\n");
-		if (value.Contains(','))
-			value = "\"" + value.Replace("\"", "\\\"") + "\"";
-		return value;
 	}
 
 	private static JsonElement? Property(this JsonElement element, string name)
