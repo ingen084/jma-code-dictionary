@@ -11,6 +11,10 @@
     "url": "https://www.data.jma.go.jp/developer/jma_multilingual.xlsx",
     "lastModified": "2026-03-26T01:33:26+00:00"
   },
+  "nwptacForecastPoint": {
+    "url": "https://www.data.jma.go.jp/eqev/data/nwptac/forecastpoint.html",
+    "lastModified": "2020-11-25T02:16:34+00:00"
+  },
   "seismicStation": {
     "url": "https://www.data.jma.go.jp/eqev/data/bulletin/data/deck/stations.zip",
     "lastModified": "2026-09-24T07:37:18+00:00"
@@ -22,6 +26,46 @@
   "tideLevelStation": {
     "url": "https://www.jma.go.jp/bosai/tidelevel/const/tide_area.json",
     "lastModified": "2026-10-22T06:41:12+00:00"
+  },
+  "tsunamiMapChugoku": {
+    "url": "https://www.jma.go.jp/jma/kishou/know/jishin/tsunamimap/Chugoku.html",
+    "lastModified": "2026-03-27T02:28:26+00:00"
+  },
+  "tsunamiMapHokkaidou": {
+    "url": "https://www.jma.go.jp/jma/kishou/know/jishin/tsunamimap/Hokkaidou.html",
+    "lastModified": "2026-03-12T04:18:17+00:00"
+  },
+  "tsunamiMapHokuriku": {
+    "url": "https://www.jma.go.jp/jma/kishou/know/jishin/tsunamimap/Hokuriku.html",
+    "lastModified": "2026-03-12T04:18:18+00:00"
+  },
+  "tsunamiMapKanto": {
+    "url": "https://www.jma.go.jp/jma/kishou/know/jishin/tsunamimap/Kanto.html",
+    "lastModified": "2026-03-12T04:18:18+00:00"
+  },
+  "tsunamiMapKinki": {
+    "url": "https://www.jma.go.jp/jma/kishou/know/jishin/tsunamimap/Kinki.html",
+    "lastModified": "2025-11-20T03:05:44+00:00"
+  },
+  "tsunamiMapKyushu": {
+    "url": "https://www.jma.go.jp/jma/kishou/know/jishin/tsunamimap/Kyushu.html",
+    "lastModified": "2026-03-12T04:58:01+00:00"
+  },
+  "tsunamiMapNansei": {
+    "url": "https://www.jma.go.jp/jma/kishou/know/jishin/tsunamimap/Nansei.html",
+    "lastModified": "2025-11-20T03:05:45+00:00"
+  },
+  "tsunamiMapShikoku": {
+    "url": "https://www.jma.go.jp/jma/kishou/know/jishin/tsunamimap/Shikoku.html",
+    "lastModified": "2026-03-12T04:18:18+00:00"
+  },
+  "tsunamiMapTohoku": {
+    "url": "https://www.jma.go.jp/jma/kishou/know/jishin/tsunamimap/Tohoku.html",
+    "lastModified": "2026-03-12T04:18:18+00:00"
+  },
+  "tsunamiMapTokai": {
+    "url": "https://www.jma.go.jp/jma/kishou/know/jishin/tsunamimap/Tokai.html",
+    "lastModified": "2026-03-12T04:18:18+00:00"
   },
   "volcano": {
     "url": "https://www.jma.go.jp/bosai/volcano/const/volcano_list.json",
