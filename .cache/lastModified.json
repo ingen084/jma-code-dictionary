@@ -25,7 +25,7 @@
   },
   "tideLevelStation": {
     "url": "https://www.jma.go.jp/bosai/tidelevel/const/tide_area.json",
-    "lastModified": "2026-10-22T06:41:12+00:00"
+    "lastModified": "2026-10-23T01:07:41+00:00"
   },
   "tsunamiMapChugoku": {
     "url": "https://www.jma.go.jp/jma/kishou/know/jishin/tsunamimap/Chugoku.html",
@@ -69,7 +69,7 @@
   },
   "volcano": {
     "url": "https://www.jma.go.jp/bosai/volcano/const/volcano_list.json",
-    "lastModified": "2026-10-20T02:07:22+00:00"
+    "lastModified": "2026-10-22T06:41:14+00:00"
   },
   "windProfilerStation": {
     "url": "https://www.jma.go.jp/bosai/windprofiler/const/station.json",
