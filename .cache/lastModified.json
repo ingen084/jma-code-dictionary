@@ -13,7 +13,7 @@
   },
   "nwptacForecastPoint": {
     "url": "https://www.data.jma.go.jp/eqev/data/nwptac/forecastpoint.html",
-    "lastModified": "2020-11-25T02:16:34+00:00"
+    "lastModified": "2026-10-22T08:24:51+00:00"
   },
   "seismicStation": {
     "url": "https://www.data.jma.go.jp/eqev/data/bulletin/data/deck/stations.zip",
