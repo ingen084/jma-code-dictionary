@@ -69,7 +69,7 @@
   },
   "volcano": {
     "url": "https://www.jma.go.jp/bosai/volcano/const/volcano_list.json",
-    "lastModified": "2026-10-22T06:41:14+00:00"
+    "lastModified": "2026-10-23T01:07:43+00:00"
   },
   "windProfilerStation": {
     "url": "https://www.jma.go.jp/bosai/windprofiler/const/station.json",
