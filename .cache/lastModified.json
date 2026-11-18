@@ -1,11 +1,11 @@
 {
   "codeManagementTable": {
-    "url": "https://xml.kishou.go.jp/jmaxml_20261110_code.xlsx",
-    "lastModified": "2026-11-10T04:19:09+00:00"
+    "url": "https://xml.kishou.go.jp/jmaxml_20261118_code.xlsx",
+    "lastModified": "2026-11-18T05:01:45+00:00"
   },
   "individualCodeTables": {
-    "url": "https://xml.kishou.go.jp/jmaxml_20261110_Code.zip",
-    "lastModified": "2026-11-10T04:19:09+00:00"
+    "url": "https://xml.kishou.go.jp/jmaxml_20261118_Code.zip",
+    "lastModified": "2026-11-18T05:01:43+00:00"
   },
   "multilingual": {
     "url": "https://www.data.jma.go.jp/developer/jma_multilingual.xlsx",
@@ -21,7 +21,7 @@
   },
   "techMaterialPage": {
     "url": "https://xml.kishou.go.jp/tec_material.html",
-    "lastModified": "2026-11-10T04:19:09+00:00"
+    "lastModified": "2026-11-18T05:01:46+00:00"
   },
   "tideLevelStation": {
     "url": "https://www.jma.go.jp/bosai/tidelevel/const/tide_area.json",
